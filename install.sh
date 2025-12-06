@@ -1,170 +1,174 @@
 #!/bin/bash
 
-# رنگ‌های ترمینال
+# Twitter/X Video Downloader Installer
+# Version: 2.0
+# Author: 2amir563
+
+set -e
+
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# تابع نمایش لوگو
+# Logo
 show_logo() {
+    clear
     echo -e "${BLUE}"
-    echo "╔════════════════════════════════════════╗"
-    echo "║                                        ║"
-    echo "║        DOWN TWITTER/X BOT              ║"
-    echo "║        Download Twitter Videos         ║"
-    echo "║                                        ║"
-    echo "╚════════════════════════════════════════╝"
+    echo "╔══════════════════════════════════════════════════╗"
+    echo "║                                                  ║"
+    echo "║         TWITTER/X VIDEO DOWNLOADER              ║"
+    echo "║               INSTALLATION SCRIPT                ║"
+    echo "║                                                  ║"
+    echo "╚══════════════════════════════════════════════════╝"
     echo -e "${NC}"
 }
 
-# تابع بررسی وجود دستورات لازم
-check_dependencies() {
-    echo -e "${YELLOW}[*] بررسی وابستگی‌های مورد نیاز...${NC}"
-    
-    local missing_deps=()
-    
-    # بررسی نصب بودن Python3
-    if ! command -v python3 &> /dev/null; then
-        missing_deps+=("python3")
-    fi
-    
-    # بررسی نصب بودن pip3
-    if ! command -v pip3 &> /dev/null; then
-        missing_deps+=("pip3")
-    fi
-    
-    # بررسی نصب بودن git
-    if ! command -v git &> /dev/null; then
-        missing_deps+=("git")
-    fi
-    
-    # بررسی نصب بودن ffmpeg
-    if ! command -v ffmpeg &> /dev/null; then
-        missing_deps+=("ffmpeg")
-    fi
-    
-    if [ ${#missing_deps[@]} -gt 0 ]; then
-        echo -e "${RED}[!] وابستگی‌های زیر یافت نشد:${NC}"
-        for dep in "${missing_deps[@]}"; do
-            echo -e "  ${RED}- $dep${NC}"
-        done
-        
-        echo -e "\n${YELLOW}[*] در حال نصب وابستگی‌های ضروری...${NC}"
-        
-        # تشخیص توزیع لینوکس
-        if [ -f /etc/debian_version ]; then
-            # دبیان/اوبونتو
-            sudo apt-get update
-            sudo apt-get install -y "${missing_deps[@]}" python3-pip
-        elif [ -f /etc/redhat-release ]; then
-            # ردهت/سنتروس/فدورا
-            sudo yum install -y "${missing_deps[@]}" python3-pip
-        elif [ -f /etc/arch-release ]; then
-            # آرچ
-            sudo pacman -Syu --noconfirm "${missing_deps[@]}" python-pip
-        else
-            echo -e "${RED}[!] توزیع لینوکس شناسایی نشد. لطفاً دستی نصب کنید.${NC}"
-            exit 1
-        fi
-    else
-        echo -e "${GREEN}[✓] تمام وابستگی‌ها نصب هستند.${NC}"
+# Print functions
+print_info() {
+    echo -e "${CYAN}[*] $1${NC}"
+}
+
+print_success() {
+    echo -e "${GREEN}[✓] $1${NC}"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[!] $1${NC}"
+}
+
+print_error() {
+    echo -e "${RED}[✗] $1${NC}"
+}
+
+# Check if running as root
+check_root() {
+    if [[ $EUID -ne 0 ]]; then
+        print_warning "This script is recommended to run as root"
+        print_info "Continuing with current user..."
     fi
 }
 
-# تابع نصب پکیج‌های پایتون
-install_python_packages() {
-    echo -e "${YELLOW}[*] نصب پکیج‌های پایتون مورد نیاز...${NC}"
-    
-    # ایجاد محیط مجازی پایتون
-    if [ ! -d "venv" ]; then
-        python3 -m venv venv
+# Detect OS and package manager
+detect_package_manager() {
+    if command -v apt-get &> /dev/null; then
+        echo "apt"
+    elif command -v yum &> /dev/null; then
+        echo "yum"
+    elif command -v dnf &> /dev/null; then
+        echo "dnf"
+    elif command -v pacman &> /dev/null; then
+        echo "pacman"
+    elif command -v apk &> /dev/null; then
+        echo "apk"
+    else
+        echo "unknown"
     fi
+}
+
+# Install system dependencies
+install_dependencies() {
+    print_info "Installing system dependencies..."
     
-    # فعال‌سازی محیط مجازی
-    source venv/bin/activate
+    local pm=$(detect_package_manager)
     
-    # نصب پکیج‌ها
+    case $pm in
+        "apt")
+            apt-get update -y
+            apt-get install -y python3 python3-pip python3-venv git ffmpeg curl wget
+            ;;
+        "yum")
+            yum install -y epel-release
+            yum install -y python3 python3-pip git ffmpeg curl wget
+            ;;
+        "dnf")
+            dnf install -y python3 python3-pip git ffmpeg curl wget
+            ;;
+        "pacman")
+            pacman -Sy --noconfirm python python-pip git ffmpeg curl wget
+            ;;
+        "apk")
+            apk update
+            apk add python3 py3-pip git ffmpeg curl wget
+            ;;
+        *)
+            print_error "Unsupported package manager. Please install manually:"
+            print_info "Python3, pip3, git, ffmpeg, curl, wget"
+            exit 1
+            ;;
+    esac
+    
+    print_success "System dependencies installed"
+}
+
+# Install Python packages
+install_python_packages() {
+    print_info "Installing Python packages..."
+    
+    # Upgrade pip
     pip3 install --upgrade pip
     
-    # نصب پکیگ‌های اصلی
+    # Install required packages
     pip3 install yt-dlp requests colorama
     
-    # غیرفعال‌سازی محیط مجازی
-    deactivate
-    
-    echo -e "${GREEN}[✓] پکیج‌های پایتون با موفقیت نصب شدند.${NC}"
+    print_success "Python packages installed"
 }
 
-# تابع ایجاد اسکریپت پایتون
-create_python_script() {
-    echo -e "${YELLOW}[*] ایجاد اسکریپت اصلی پایتون...${NC}"
+# Create main download script
+create_download_script() {
+    print_info "Creating download script..."
     
-    cat > twitter_downloader.py << 'EOF'
+    # Create the main script directory
+    mkdir -p /opt/twitter-dl
+    
+    # Create main Python script
+    cat > /opt/twitter-dl/twitter_downloader.py << 'EOF'
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+# Twitter/X Video Downloader
+# Simple and easy to use
 
 import os
 import sys
 import subprocess
-import re
 import json
-from colorama import init, Fore, Style
+from datetime import datetime
 
-# راه‌اندازی colorama
-init(autoreset=True)
-
-class TwitterVideoDownloader:
+class TwitterDownloader:
     def __init__(self):
-        self.quality_options = {
-            '1': 'best (بهترین کیفیت)',
-            '2': '1080p',
-            '3': '720p', 
-            '4': '480p',
-            '5': '360p',
-            '6': '240p',
-            '7': '144p'
-        }
+        self.script_dir = "/opt/twitter-dl"
+        self.download_dir = os.path.expanduser("~/Downloads/Twitter")
         
+        # Create download directory
+        os.makedirs(self.download_dir, exist_ok=True)
+    
     def clear_screen(self):
-        """پاک کردن صفحه ترمینال"""
-        os.system('cls' if os.name == 'nt' else 'clear')
+        """Clear terminal screen"""
+        os.system('clear' if os.name == 'posix' else 'cls')
     
     def show_banner(self):
-        """نمایش بنر برنامه"""
-        banner = f"""
-{Fore.CYAN}
-╔══════════════════════════════════════════════════════════╗
-║                                                          ║
-║              {Fore.YELLOW}Twitter/X Video Downloader{Fore.CYAN}                ║
-║                    {Fore.GREEN}نسخه 2.0{Fore.CYAN}                           ║
-║                                                          ║
-╚══════════════════════════════════════════════════════════╝
-{Style.RESET_ALL}
-        """
-        print(banner)
+        """Show application banner"""
+        print("\n" + "="*60)
+        print("        TWITTER/X VIDEO DOWNLOADER")
+        print("="*60 + "\n")
     
-    def validate_twitter_url(self, url):
-        """اعتبارسنجی لینک توییتر"""
-        twitter_patterns = [
-            r'https?://(?:www\.)?(?:twitter\.com|x\.com)/[^/]+/status/\d+',
-            r'https?://(?:mobile\.)?(?:twitter\.com|x\.com)/[^/]+/status/\d+',
-            r'https?://t\.co/[a-zA-Z0-9]+',
-            r'https?://vm\.tiktok\.com/[a-zA-Z0-9]+'  # برای لینک‌های کوتاه توییتر
-        ]
-        
-        for pattern in twitter_patterns:
-            if re.match(pattern, url):
-                return True
-        return False
+    def check_ytdlp(self):
+        """Check if yt-dlp is installed"""
+        try:
+            subprocess.run(['yt-dlp', '--version'], 
+                          capture_output=True, check=True)
+            return True
+        except:
+            return False
     
     def get_video_info(self, url):
-        """دریافت اطلاعات ویدیو"""
-        print(f"\n{Fore.YELLOW}[*] در حال دریافت اطلاعات ویدیو...{Style.RESET_ALL}")
+        """Get video information"""
+        print("\n📡 Getting video information...")
         
         try:
-            # استفاده از yt-dlp برای دریافت اطلاعات
+            # Get video info in JSON format
             cmd = [
                 'yt-dlp',
                 '--skip-download',
@@ -179,317 +183,361 @@ class TwitterVideoDownloader:
                 info = json.loads(result.stdout)
                 return info
             else:
-                print(f"{Fore.RED}[!] خطا در دریافت اطلاعات ویدیو{Style.RESET_ALL}")
-                print(f"{Fore.RED}[!] خطا: {result.stderr}{Style.RESET_ALL}")
+                print("❌ Error getting video info")
                 return None
                 
-        except subprocess.TimeoutExpired:
-            print(f"{Fore.RED}[!] زمان دریافت اطلاعات به پایان رسید{Style.RESET_ALL}")
-            return None
-        except json.JSONDecodeError:
-            print(f"{Fore.RED}[!] خطا در پردازش اطلاعات دریافتی{Style.RESET_ALL}")
-            return None
         except Exception as e:
-            print(f"{Fore.RED}[!] خطای ناشناخته: {str(e)}{Style.RESET_ALL}")
+            print(f"❌ Error: {str(e)}")
             return None
     
-    def format_file_size(self, bytes):
-        """قالب‌بندی حجم فایل"""
-        for unit in ['B', 'KB', 'MB', 'GB']:
-            if bytes < 1024.0:
-                return f"{bytes:.2f} {unit}"
-            bytes /= 1024.0
-        return f"{bytes:.2f} TB"
-    
-    def show_quality_options(self, formats):
-        """نمایش گزینه‌های کیفیت"""
-        print(f"\n{Fore.GREEN}[+] گزینه‌های کیفیت موجود:{Style.RESET_ALL}")
-        print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
-        
-        video_formats = []
-        for f in formats:
-            if f.get('vcodec') != 'none':  # فقط فرمت‌های ویدیویی
-                video_formats.append(f)
-        
-        # مرتب‌سازی بر اساس کیفیت
-        video_formats.sort(key=lambda x: x.get('height', 0), reverse=True)
-        
-        options = {}
-        option_num = 1
-        
-        for fmt in video_formats:
-            height = fmt.get('height', 0)
-            width = fmt.get('width', 0)
-            filesize = fmt.get('filesize', fmt.get('filesize_approx', 0))
-            ext = fmt.get('ext', 'unknown')
-            format_note = fmt.get('format_note', '')
+    def get_available_formats(self, url):
+        """Get available formats"""
+        try:
+            cmd = ['yt-dlp', '-F', '--no-warnings', url]
+            result = subprocess.run(cmd, capture_output=True, text=True)
             
-            if height:
-                quality_label = f"{height}p"
-                if format_note:
-                    quality_label += f" ({format_note})"
+            if result.returncode == 0:
+                return result.stdout
+            else:
+                return None
                 
-                size_str = self.format_file_size(filesize) if filesize else "نامشخص"
-                
-                print(f"{Fore.YELLOW}[{option_num}]{Style.RESET_ALL} {quality_label:<15} | {ext:<10} | {size_str:<15}")
-                
-                options[str(option_num)] = {
-                    'format_id': fmt['format_id'],
-                    'quality': quality_label,
-                    'ext': ext,
-                    'filesize': filesize
-                }
-                option_num += 1
-        
-        print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
-        return options
+        except Exception as e:
+            print(f"❌ Error: {str(e)}")
+            return None
     
-    def download_video(self, url, format_id, quality):
-        """دانلود ویدیو"""
-        print(f"\n{Fore.YELLOW}[*] در حال دانلود با کیفیت {quality}...{Style.RESET_ALL}")
+    def download_video(self, url, format_code):
+        """Download video with specified format"""
+        print(f"\n⬇️  Downloading video (Format: {format_code})...")
+        print("This may take a while depending on video size...\n")
         
-        # نام فایل خروجی
-        output_template = '%(title)s_%(height)sp.%(ext)s'
+        # Change to download directory
+        os.chdir(self.download_dir)
         
         try:
+            # Download with progress
             cmd = [
                 'yt-dlp',
-                '-f', format_id,
-                '-o', output_template,
-                '--no-warnings',
+                '-f', format_code,
+                '-o', '%(title)s_%(height)sp.%(ext)s',
                 '--progress',
+                '--no-warnings',
                 url
             ]
             
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            # Run download
+            process = subprocess.Popen(cmd, 
+                                     stdout=subprocess.PIPE, 
+                                     stderr=subprocess.STDOUT,
+                                     text=True,
+                                     bufsize=1,
+                                     universal_newlines=True)
             
+            # Show progress
             for line in process.stdout:
-                if 'ETA' in line or '%' in line:
-                    print(f"\r{Fore.CYAN}{line.strip()}{Style.RESET_ALL}", end='', flush=True)
+                if '[download]' in line:
+                    sys.stdout.write('\r' + line.strip())
+                    sys.stdout.flush()
             
             process.wait()
             
             if process.returncode == 0:
-                print(f"\n{Fore.GREEN}[✓] دانلود با موفقیت انجام شد!{Style.RESET_ALL}")
+                print(f"\n\n✅ Download completed!")
+                print(f"📁 Saved in: {self.download_dir}")
                 return True
             else:
-                print(f"\n{Fore.RED}[!] خطا در دانلود ویدیو{Style.RESET_ALL}")
+                print("\n\n❌ Download failed")
                 return False
                 
         except Exception as e:
-            print(f"\n{Fore.RED}[!] خطا: {str(e)}{Style.RESET_ALL}")
+            print(f"\n❌ Error: {str(e)}")
             return False
+        finally:
+            # Return to script directory
+            os.chdir(self.script_dir)
     
-    def run(self):
-        """اجرای اصلی برنامه"""
+    def show_help(self):
+        """Show help message"""
+        print("\n📋 Common Format Codes:")
+        print("-" * 40)
+        print("best      : Best quality (video + audio)")
+        print("worst     : Worst quality (video + audio)")
+        print("bestvideo : Best video only")
+        print("bestaudio : Best audio only")
+        print("137+140   : Specific format (1080p + audio)")
+        print("\n💡 Tip: Use 'yt-dlp -F URL' to see all formats")
+    
+    def run_interactive(self):
+        """Run in interactive mode"""
         self.clear_screen()
         self.show_banner()
         
+        # Check yt-dlp
+        if not self.check_ytdlp():
+            print("❌ yt-dlp is not installed!")
+            print("Please install it first: pip3 install yt-dlp")
+            return
+        
+        print("Welcome! Enter Twitter/X URLs to download videos.")
+        print("Type 'help' for format codes, 'exit' to quit.\n")
+        
         while True:
             try:
-                print(f"\n{Fore.CYAN}[*] لطفاً لینک توییتر/X را وارد کنید (یا 'exit' برای خروج):{Style.RESET_ALL}")
-                url = input(f"{Fore.GREEN}>>> {Style.RESET_ALL}").strip()
+                # Get URL from user
+                url = input("\n🔗 Enter Twitter/X URL: ").strip()
                 
                 if url.lower() == 'exit':
-                    print(f"\n{Fore.YELLOW}[*] خروج از برنامه...{Style.RESET_ALL}")
+                    print("\n👋 Goodbye!")
                     break
                 
-                if not self.validate_twitter_url(url):
-                    print(f"{Fore.RED}[!] لینک وارد شده معتبر نیست!{Style.RESET_ALL}")
-                    print(f"{Fore.YELLOW}[*] لطفاً یک لینک معتبر توییتر/X وارد کنید.{Style.RESET_ALL}")
+                if url.lower() == 'help':
+                    self.show_help()
                     continue
                 
-                # دریافت اطلاعات ویدیو
-                video_info = self.get_video_info(url)
-                
-                if not video_info:
-                    print(f"{Fore.RED}[!] امکان دریافت اطلاعات ویدیو وجود ندارد.{Style.RESET_ALL}")
+                if not url:
                     continue
                 
-                # نمایش اطلاعات ویدیو
-                print(f"\n{Fore.GREEN}[+] اطلاعات ویدیو:{Style.RESET_ALL}")
-                print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
-                print(f"{Fore.YELLOW}عنوان:{Style.RESET_ALL} {video_info.get('title', 'نامشخص')}")
-                print(f"{Fore.YELLOW}مدت زمان:{Style.RESET_ALL} {video_info.get('duration_string', 'نامشخص')}")
-                print(f"{Fore.YELLOW}تعداد بازدید:{Style.RESET_ALL} {video_info.get('view_count', 'نامشخص')}")
-                print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
-                
-                # نمایش گزینه‌های کیفیت
-                formats = video_info.get('formats', [])
-                if not formats:
-                    print(f"{Fore.RED}[!] هیچ فرمت ویدیویی یافت نشد.{Style.RESET_ALL}")
+                # Validate URL (basic check)
+                if 'twitter.com' not in url and 'x.com' not in url:
+                    print("⚠️  Please enter a valid Twitter/X URL")
                     continue
                 
-                quality_options = self.show_quality_options(formats)
-                
-                if not quality_options:
-                    print(f"{Fore.RED}[!] گزینه کیفیتی یافت نشد.{Style.RESET_ALL}")
+                # Get available formats
+                formats = self.get_available_formats(url)
+                if formats:
+                    print("\n📊 Available formats:")
+                    print("-" * 60)
+                    print(formats)
+                    print("-" * 60)
+                else:
+                    print("❌ Could not get format information")
                     continue
                 
-                # انتخاب کیفیت توسط کاربر
-                print(f"\n{Fore.CYAN}[*] لطفاً عدد کیفیت مورد نظر را انتخاب کنید:{Style.RESET_ALL}")
-                choice = input(f"{Fore.GREEN}>>> {Style.RESET_ALL}").strip()
+                # Get format choice
+                format_code = input("\n🎬 Enter format code (default: 'best'): ").strip()
+                if not format_code:
+                    format_code = "best"
                 
-                if choice not in quality_options:
-                    print(f"{Fore.RED}[!] انتخاب نامعتبر!{Style.RESET_ALL}")
-                    continue
+                # Get video info
+                info = self.get_video_info(url)
+                if info:
+                    title = info.get('title', 'Unknown')
+                    duration = info.get('duration_string', 'Unknown')
+                    print(f"\n📝 Title: {title}")
+                    print(f"⏱️  Duration: {duration}")
                 
-                selected = quality_options[choice]
+                # Confirm download
+                confirm = input(f"\n❓ Download with format '{format_code}'? (y/N): ").strip().lower()
                 
-                # تایید نهایی
-                print(f"\n{Fore.YELLOW}[*] تایید نهایی:{Style.RESET_ALL}")
-                print(f"{Fore.CYAN}لینک:{Style.RESET_ALL} {url}")
-                print(f"{Fore.CYAN}کیفیت:{Style.RESET_ALL} {selected['quality']}")
-                if selected['filesize']:
-                    print(f"{Fore.CYAN}حجم تقریبی:{Style.RESET_ALL} {self.format_file_size(selected['filesize'])}")
-                
-                print(f"\n{Fore.CYAN}[*] آیا مایل به ادامه هستید؟ (y/n):{Style.RESET_ALL}")
-                confirm = input(f"{Fore.GREEN}>>> {Style.RESET_ALL}").strip().lower()
-                
-                if confirm != 'y':
-                    print(f"{Fore.YELLOW}[*] دانلود لغو شد.{Style.RESET_ALL}")
-                    continue
-                
-                # شروع دانلود
-                success = self.download_video(url, selected['format_id'], selected['quality'])
-                
-                if success:
-                    print(f"\n{Fore.GREEN}[✓] عملیات با موفقیت به پایان رسید!{Style.RESET_ALL}")
-                
-                # پرسش برای ادامه
-                print(f"\n{Fore.CYAN}[*] آیا می‌خواهید ویدیوی دیگری دانلود کنید؟ (y/n):{Style.RESET_ALL}")
-                continue_choice = input(f"{Fore.GREEN}>>> {Style.RESET_ALL}").strip().lower()
-                
-                if continue_choice != 'y':
-                    print(f"\n{Fore.YELLOW}[*] با تشکر از استفاده شما!{Style.RESET_ALL}")
-                    break
+                if confirm == 'y':
+                    # Download video
+                    success = self.download_video(url, format_code)
                     
+                    if success:
+                        # Ask for another download
+                        another = input("\n❓ Download another video? (y/N): ").strip().lower()
+                        if another != 'y':
+                            print("\n👋 Goodbye!")
+                            break
+                    else:
+                        retry = input("\n❓ Download failed. Try again? (y/N): ").strip().lower()
+                        if retry != 'y':
+                            break
+                else:
+                    print("⚠️  Download cancelled")
+                
                 self.clear_screen()
                 self.show_banner()
-                    
+                
             except KeyboardInterrupt:
-                print(f"\n\n{Fore.YELLOW}[*] برنامه توسط کاربر متوقف شد.{Style.RESET_ALL}")
+                print("\n\n⚠️  Interrupted by user")
                 break
             except Exception as e:
-                print(f"\n{Fore.RED}[!] خطای غیرمنتظره: {str(e)}{Style.RESET_ALL}")
+                print(f"\n❌ Error: {str(e)}")
                 continue
 
 def main():
-    """تابع اصلی"""
-    downloader = TwitterVideoDownloader()
-    downloader.run()
+    """Main function"""
+    downloader = TwitterDownloader()
+    downloader.run_interactive()
 
 if __name__ == "__main__":
     main()
 EOF
     
-    # دادن مجوز اجرا به فایل
-    os.chmod('twitter_downloader.py', 0o755)
+    # Give execute permission
+    os.chmod('/opt/twitter-dl/twitter_downloader.py', 0o755)
     
-    echo -e "${GREEN}[✓] اسکریپت پایتون ایجاد شد.${NC}"
-}
-
-# تابع ایجاد اسکریپت اجرایی
-create_launcher() {
-    echo -e "${YELLOW}[*] ایجاد اسکریپت اجرایی...${NC}"
-    
-    cat > down-twitter-x.sh << 'EOF'
+    # Create launcher script
+    cat > /usr/local/bin/twitter-dl << 'EOF'
 #!/bin/bash
+# Twitter/X Video Downloader Launcher
 
-# مسیر اسکریپت
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_SCRIPT="$SCRIPT_DIR/twitter_downloader.py"
+python3 /opt/twitter-dl/twitter_downloader.py "$@"
+EOF
+    
+    # Give execute permission
+    chmod +x /usr/local/bin/twitter_downloader.py
+    chmod +x /usr/local/bin/twitter-dl
+    
+    # Create simple bash script alternative
+    cat > /usr/local/bin/twitter-download << 'EOF'
+#!/bin/bash
+# Simple Twitter Download Script
 
-# بررسی وجود اسکریپت پایتون
-if [ ! -f "$PYTHON_SCRIPT" ]; then
-    echo "خطا: اسکریپت پایتون یافت نشد!"
-    echo "لطفاً ابتدا نصب را کامل کنید: ./install.sh"
+if [ -z "$1" ]; then
+    echo "Usage: twitter-download <twitter-url> [format]"
+    echo ""
+    echo "Examples:"
+    echo "  twitter-download https://twitter.com/user/status/123456789"
+    echo "  twitter-download https://x.com/user/status/123456789 best"
+    echo "  twitter-download https://twitter.com/user/status/123456789 137+140"
+    echo ""
+    echo "To see available formats:"
+    echo "  yt-dlp -F <url>"
     exit 1
 fi
 
-# فعال‌سازی محیط مجازی پایتون
-if [ -d "$SCRIPT_DIR/venv" ]; then
-    source "$SCRIPT_DIR/venv/bin/activate"
-fi
+URL="$1"
+FORMAT="${2:-best}"
 
-# اجرای اسکریپت پایتون
-python3 "$PYTHON_SCRIPT"
+echo "Downloading: $URL"
+echo "Format: $FORMAT"
+echo ""
 
-# غیرفعال‌سازی محیط مجازی
-if [ -d "$SCRIPT_DIR/venv" ]; then
-    deactivate
+cd ~/Downloads 2>/dev/null || cd ~
+
+yt-dlp -f "$FORMAT" -o "%(title)s.%(ext)s" "$URL"
+
+if [ $? -eq 0 ]; then
+    echo ""
+    echo "✅ Download completed!"
+else
+    echo ""
+    echo "❌ Download failed!"
 fi
 EOF
     
-    # دادن مجوز اجرا به فایل
-    chmod +x down-twitter-x.sh
+    chmod +x /usr/local/bin/twitter-download
     
-    echo -e "${GREEN}[✓] اسکریپت اجرایی ایجاد شد.${NC}"
+    print_success "Download scripts created"
 }
 
-# تابع نمایش راهنمای استفاده
-show_usage() {
-    echo -e "${GREEN}"
-    cat << EOF
-
-═══════════════════════════════════════════════════
-                راهنمای استفاده
-═══════════════════════════════════════════════════
-
-پس از نصب کامل، می‌توانید از روش‌های زیر استفاده کنید:
-
-1. روش مستقیم:
-   ./down-twitter-x.sh
-
-2. ایجاد لینک سمبلیک (اختیاری):
-   sudo ln -s \$(pwd)/down-twitter-x.sh /usr/local/bin/twitter-dl
-   سپس: twitter-dl
-
-3. اجرای مستقیم اسکریپت پایتون:
-   ./twitter_downloader.py
-
-═══════════════════════════════════════════════════
-   دستورات سریع:
-═══════════════════════════════════════════════════
-   نصب مجدد:        ./install.sh
-   به‌روزرسانی:      git pull
-   حذف برنامه:      rm -rf down-twitter-x/
-═══════════════════════════════════════════════════
-
-${NC}"
+# Create configuration
+create_config() {
+    print_info "Creating configuration..."
+    
+    # Create config directory
+    mkdir -p /etc/twitter-dl
+    
+    # Create basic config
+    cat > /etc/twitter-dl/config.json << 'EOF'
+{
+    "download_path": "~/Downloads/Twitter",
+    "default_format": "best",
+    "enable_progress": true,
+    "max_retries": 3,
+    "timeout": 30
+}
+EOF
+    
+    print_success "Configuration created"
 }
 
-# تابع اصلی نصب
-main_installation() {
-    show_logo
-    echo -e "${GREEN}[*] شروع فرآیند نصب Down Twitter/X Bot...${NC}"
+# Add to bashrc
+setup_aliases() {
+    print_info "Setting up aliases..."
     
-    # بررسی وابستگی‌ها
-    check_dependencies
+    # Add aliases to bashrc if they don't exist
+    if ! grep -q "twitter-dl" /root/.bashrc 2>/dev/null; then
+        echo "" >> /root/.bashrc
+        echo "# Twitter Downloader Aliases" >> /root/.bashrc
+        echo "alias twitter-dl='/usr/local/bin/twitter-dl'" >> /root/.bashrc
+        echo "alias twitter-download='/usr/local/bin/twitter-download'" >> /root/.bashrc
+        echo "alias tdl='/usr/local/bin/twitter-dl'" >> /root/.bashrc
+    fi
     
-    # نصب پکیج‌های پایتون
-    install_python_packages
+    # Also for current user if not root
+    if [ "$(whoami)" != "root" ]; then
+        if [ -f ~/.bashrc ] && ! grep -q "twitter-dl" ~/.bashrc; then
+            echo "" >> ~/.bashrc
+            echo "# Twitter Downloader Aliases" >> ~/.bashrc
+            echo "alias twitter-dl='/usr/local/bin/twitter-dl'" >> ~/.bashrc
+            echo "alias tdl='/usr/local/bin/twitter-dl'" >> ~/.bashrc
+        fi
+    fi
     
-    # ایجاد اسکریپت پایتون
-    create_python_script
-    
-    # ایجاد اسکریپت اجرایی
-    create_launcher
-    
+    print_success "Aliases added"
+}
+
+# Show completion message
+show_completion() {
     echo -e "${GREEN}"
-    echo "╔════════════════════════════════════════╗"
-    echo "║                                        ║"
-    echo "║   نصب با موفقیت کامل شد! 🎉          ║"
-    echo "║                                        ║"
-    echo "╚════════════════════════════════════════╝"
+    echo "╔══════════════════════════════════════════════════╗"
+    echo "║                                                  ║"
+    echo "║           INSTALLATION COMPLETE! 🎉             ║"
+    echo "║                                                  ║"
+    echo "╚══════════════════════════════════════════════════╝"
     echo -e "${NC}"
     
-    # نمایش راهنمای استفاده
-    show_usage
+    echo -e "\n${CYAN}📦 Available Commands:${NC}"
+    echo -e "${GREEN}  twitter-dl${NC}        - Interactive downloader"
+    echo -e "${GREEN}  twitter-download${NC}  - Quick download (twitter-download <url> [format])"
+    echo -e "${GREEN}  tdl${NC}              - Short alias for twitter-dl"
     
-    echo -e "${YELLOW}[*] برای شروع، دستور زیر را اجرا کنید:${NC}"
-    echo -e "${GREEN}    ./down-twitter-x.sh${NC}"
+    echo -e "\n${CYAN}🚀 Quick Start:${NC}"
+    echo -e "  ${GREEN}1.${NC} Open new terminal or run: ${YELLOW}source ~/.bashrc${NC}"
+    echo -e "  ${GREEN}2.${NC} Start downloader: ${YELLOW}twitter-dl${NC}"
+    echo -e "  ${GREEN}3.${NC} Enter Twitter/X URL when prompted"
+    
+    echo -e "\n${CYAN}📝 Examples:${NC}"
+    echo -e "  ${YELLOW}twitter-dl${NC}"
+    echo -e "  ${YELLOW}twitter-download https://twitter.com/user/status/123456789${NC}"
+    echo -e "  ${YELLOW}twitter-download https://x.com/user/status/123456789 'best'${NC}"
+    
+    echo -e "\n${CYAN}📁 Download Location:${NC}"
+    echo -e "  ${YELLOW}~/Downloads/Twitter/${NC}"
+    
+    echo -e "\n${CYAN}🔧 Manual Download with yt-dlp:${NC}"
+    echo -e "  ${YELLOW}yt-dlp -F <url>${NC}               # Show available formats"
+    echo -e "  ${YELLOW}yt-dlp -f best <url>${NC}          # Download best quality"
+    echo -e "  ${YELLOW}yt-dlp -f '137+140' <url>${NC}     # Download specific format"
+    
+    echo -e "\n${YELLOW}Need help?${NC} Run ${GREEN}twitter-dl${NC} and type 'help' when prompted.\n"
 }
 
-# اجرای تابع اصلی
+# Main installation function
+main_installation() {
+    show_logo
+    check_root
+    install_dependencies
+    install_python_packages
+    create_download_script
+    create_config
+    setup_aliases
+    show_completion
+}
+
+# Handle errors
+handle_error() {
+    print_error "Installation failed!"
+    print_error "Error on line $1"
+    exit 1
+}
+
+# Set error trap
+trap 'handle_error $LINENO' ERR
+
+# Run installation
 main_installation
+
+# Load aliases immediately
+if [ -f /root/.bashrc ]; then
+    source /root/.bashrc 2>/dev/null || true
+fi
+
+if [ -f ~/.bashrc ]; then
+    source ~/.bashrc 2>/dev/null || true
+fi
+
+print_info "Installation finished successfully!"
+print_info "You can now use 'twitter-dl' command"
