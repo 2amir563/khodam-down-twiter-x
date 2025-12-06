@@ -16,7 +16,7 @@ twitter-bot setup
 یا این کد زیر بزن که توکن بدهی بهش
 
  ```
-nano /opt/twitter_caption_bot/.env
+nano /opt/twitter_smart_bot/.env
 ```
 
 مرحله ۲: ویرایش فایل config (اضافه کردن توکن ربات)
