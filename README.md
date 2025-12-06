@@ -25,7 +25,10 @@ bash
 twitter-bot test
 مرحله ۴: اجرای ربات
 bash
+```
 twitter-bot start
+```
+
 مرحله ۵: بررسی وضعیت
 bash
 twitter-bot status
