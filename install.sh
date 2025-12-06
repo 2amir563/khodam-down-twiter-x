@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # Twitter/X Video Downloader Installer
-# Version: 2.0
-# Author: 2amir563
+# Simple Version - Fixed Syntax Errors
 
 set -e
 
@@ -11,389 +10,166 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 # Logo
 show_logo() {
     clear
     echo -e "${BLUE}"
-    echo "╔══════════════════════════════════════════════════╗"
-    echo "║                                                  ║"
-    echo "║         TWITTER/X VIDEO DOWNLOADER              ║"
-    echo "║               INSTALLATION SCRIPT                ║"
-    echo "║                                                  ║"
-    echo "╚══════════════════════════════════════════════════╝"
+    echo "=============================================="
+    echo "     TWITTER/X VIDEO DOWNLOADER"
+    echo "         INSTALLATION SCRIPT"
+    echo "=============================================="
     echo -e "${NC}"
 }
 
 # Print functions
-print_info() {
-    echo -e "${CYAN}[*] $1${NC}"
-}
+info() { echo -e "${BLUE}[*] $1${NC}"; }
+success() { echo -e "${GREEN}[✓] $1${NC}"; }
+warning() { echo -e "${YELLOW}[!] $1${NC}"; }
+error() { echo -e "${RED}[✗] $1${NC}"; }
 
-print_success() {
-    echo -e "${GREEN}[✓] $1${NC}"
-}
-
-print_warning() {
-    echo -e "${YELLOW}[!] $1${NC}"
-}
-
-print_error() {
-    echo -e "${RED}[✗] $1${NC}"
-}
-
-# Check if running as root
-check_root() {
-    if [[ $EUID -ne 0 ]]; then
-        print_warning "This script is recommended to run as root"
-        print_info "Continuing with current user..."
-    fi
-}
-
-# Detect OS and package manager
-detect_package_manager() {
-    if command -v apt-get &> /dev/null; then
-        echo "apt"
+# Install dependencies
+install_deps() {
+    info "Installing system dependencies..."
+    
+    # Update system
+    if command -v apt &> /dev/null; then
+        apt update -y
+        apt install -y python3 python3-pip python3-venv git ffmpeg curl wget
     elif command -v yum &> /dev/null; then
-        echo "yum"
+        yum install -y python3 python3-pip git ffmpeg curl wget
     elif command -v dnf &> /dev/null; then
-        echo "dnf"
+        dnf install -y python3 python3-pip git ffmpeg curl wget
     elif command -v pacman &> /dev/null; then
-        echo "pacman"
+        pacman -Sy --noconfirm python python-pip git ffmpeg curl wget
     elif command -v apk &> /dev/null; then
-        echo "apk"
+        apk add python3 py3-pip git ffmpeg curl wget
     else
-        echo "unknown"
-    fi
-}
-
-# Install system dependencies
-install_dependencies() {
-    print_info "Installing system dependencies..."
-    
-    local pm=$(detect_package_manager)
-    
-    case $pm in
-        "apt")
-            apt-get update -y
-            apt-get install -y python3 python3-pip python3-venv git ffmpeg curl wget
-            ;;
-        "yum")
-            yum install -y epel-release
-            yum install -y python3 python3-pip git ffmpeg curl wget
-            ;;
-        "dnf")
-            dnf install -y python3 python3-pip git ffmpeg curl wget
-            ;;
-        "pacman")
-            pacman -Sy --noconfirm python python-pip git ffmpeg curl wget
-            ;;
-        "apk")
-            apk update
-            apk add python3 py3-pip git ffmpeg curl wget
-            ;;
-        *)
-            print_error "Unsupported package manager. Please install manually:"
-            print_info "Python3, pip3, git, ffmpeg, curl, wget"
+        warning "Could not detect package manager"
+        info "Trying to install manually..."
+        # Try to install python3 and pip
+        if ! command -v python3 &> /dev/null; then
+            error "Python3 not found. Please install manually."
             exit 1
-            ;;
-    esac
+        fi
+    fi
     
-    print_success "System dependencies installed"
+    success "Dependencies installed"
 }
 
 # Install Python packages
 install_python_packages() {
-    print_info "Installing Python packages..."
+    info "Installing Python packages..."
     
-    # Upgrade pip
     pip3 install --upgrade pip
+    pip3 install yt-dlp
     
-    # Install required packages
-    pip3 install yt-dlp requests colorama
-    
-    print_success "Python packages installed"
+    success "Python packages installed"
 }
 
-# Create main download script
-create_download_script() {
-    print_info "Creating download script..."
+# Create simple download script
+create_simple_script() {
+    info "Creating download script..."
     
-    # Create the main script directory
-    mkdir -p /opt/twitter-dl
+    # Create directory
+    mkdir -p /opt/twitter-downloader
     
-    # Create main Python script
-    cat > /opt/twitter-dl/twitter_downloader.py << 'EOF'
+    # Create simple Python script
+    cat > /opt/twitter-downloader/download.py << 'PYEOF'
 #!/usr/bin/env python3
-# Twitter/X Video Downloader
-# Simple and easy to use
-
-import os
-import sys
 import subprocess
-import json
-from datetime import datetime
+import sys
+import os
 
-class TwitterDownloader:
-    def __init__(self):
-        self.script_dir = "/opt/twitter-dl"
-        self.download_dir = os.path.expanduser("~/Downloads/Twitter")
+def main():
+    print("Twitter/X Video Downloader")
+    print("=" * 40)
+    
+    if len(sys.argv) > 1:
+        # Command line mode
+        url = sys.argv[1]
+        if len(sys.argv) > 2:
+            fmt = sys.argv[2]
+        else:
+            fmt = "best"
         
-        # Create download directory
-        os.makedirs(self.download_dir, exist_ok=True)
-    
-    def clear_screen(self):
-        """Clear terminal screen"""
-        os.system('clear' if os.name == 'posix' else 'cls')
-    
-    def show_banner(self):
-        """Show application banner"""
-        print("\n" + "="*60)
-        print("        TWITTER/X VIDEO DOWNLOADER")
-        print("="*60 + "\n")
-    
-    def check_ytdlp(self):
-        """Check if yt-dlp is installed"""
-        try:
-            subprocess.run(['yt-dlp', '--version'], 
-                          capture_output=True, check=True)
-            return True
-        except:
-            return False
-    
-    def get_video_info(self, url):
-        """Get video information"""
-        print("\n📡 Getting video information...")
+        print(f"URL: {url}")
+        print(f"Format: {fmt}")
+        print("Downloading...")
         
-        try:
-            # Get video info in JSON format
-            cmd = [
-                'yt-dlp',
-                '--skip-download',
-                '--dump-json',
-                '--no-warnings',
-                url
-            ]
-            
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            
-            if result.returncode == 0:
-                info = json.loads(result.stdout)
-                return info
-            else:
-                print("❌ Error getting video info")
-                return None
-                
-        except Exception as e:
-            print(f"❌ Error: {str(e)}")
-            return None
-    
-    def get_available_formats(self, url):
-        """Get available formats"""
-        try:
-            cmd = ['yt-dlp', '-F', '--no-warnings', url]
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            
-            if result.returncode == 0:
-                return result.stdout
-            else:
-                return None
-                
-        except Exception as e:
-            print(f"❌ Error: {str(e)}")
-            return None
-    
-    def download_video(self, url, format_code):
-        """Download video with specified format"""
-        print(f"\n⬇️  Downloading video (Format: {format_code})...")
-        print("This may take a while depending on video size...\n")
+        cmd = f'yt-dlp -f {fmt} -o "%(title)s.%(ext)s" "{url}"'
+        result = subprocess.run(cmd, shell=True)
         
-        # Change to download directory
-        os.chdir(self.download_dir)
+        if result.returncode == 0:
+            print("Download completed!")
+        else:
+            print("Download failed!")
+        
+        sys.exit(result.returncode)
+    
+    # Interactive mode
+    while True:
+        print("\nOptions:")
+        print("1. Download video")
+        print("2. Show available formats")
+        print("3. Exit")
         
         try:
-            # Download with progress
-            cmd = [
-                'yt-dlp',
-                '-f', format_code,
-                '-o', '%(title)s_%(height)sp.%(ext)s',
-                '--progress',
-                '--no-warnings',
-                url
-            ]
+            choice = input("\nSelect option (1-3): ").strip()
             
-            # Run download
-            process = subprocess.Popen(cmd, 
-                                     stdout=subprocess.PIPE, 
-                                     stderr=subprocess.STDOUT,
-                                     text=True,
-                                     bufsize=1,
-                                     universal_newlines=True)
-            
-            # Show progress
-            for line in process.stdout:
-                if '[download]' in line:
-                    sys.stdout.write('\r' + line.strip())
-                    sys.stdout.flush()
-            
-            process.wait()
-            
-            if process.returncode == 0:
-                print(f"\n\n✅ Download completed!")
-                print(f"📁 Saved in: {self.download_dir}")
-                return True
-            else:
-                print("\n\n❌ Download failed")
-                return False
-                
-        except Exception as e:
-            print(f"\n❌ Error: {str(e)}")
-            return False
-        finally:
-            # Return to script directory
-            os.chdir(self.script_dir)
-    
-    def show_help(self):
-        """Show help message"""
-        print("\n📋 Common Format Codes:")
-        print("-" * 40)
-        print("best      : Best quality (video + audio)")
-        print("worst     : Worst quality (video + audio)")
-        print("bestvideo : Best video only")
-        print("bestaudio : Best audio only")
-        print("137+140   : Specific format (1080p + audio)")
-        print("\n💡 Tip: Use 'yt-dlp -F URL' to see all formats")
-    
-    def run_interactive(self):
-        """Run in interactive mode"""
-        self.clear_screen()
-        self.show_banner()
-        
-        # Check yt-dlp
-        if not self.check_ytdlp():
-            print("❌ yt-dlp is not installed!")
-            print("Please install it first: pip3 install yt-dlp")
-            return
-        
-        print("Welcome! Enter Twitter/X URLs to download videos.")
-        print("Type 'help' for format codes, 'exit' to quit.\n")
-        
-        while True:
-            try:
-                # Get URL from user
-                url = input("\n🔗 Enter Twitter/X URL: ").strip()
-                
-                if url.lower() == 'exit':
-                    print("\n👋 Goodbye!")
-                    break
-                
-                if url.lower() == 'help':
-                    self.show_help()
-                    continue
-                
+            if choice == "1":
+                url = input("Enter Twitter/X URL: ").strip()
                 if not url:
                     continue
                 
-                # Validate URL (basic check)
-                if 'twitter.com' not in url and 'x.com' not in url:
-                    print("⚠️  Please enter a valid Twitter/X URL")
-                    continue
+                fmt = input("Enter format (default: best): ").strip()
+                if not fmt:
+                    fmt = "best"
                 
-                # Get available formats
-                formats = self.get_available_formats(url)
-                if formats:
-                    print("\n📊 Available formats:")
-                    print("-" * 60)
-                    print(formats)
-                    print("-" * 60)
-                else:
-                    print("❌ Could not get format information")
-                    continue
+                print(f"\nDownloading with format: {fmt}")
+                cmd = f'yt-dlp -f {fmt} -o "%(title)s.%(ext)s" "{url}"'
+                subprocess.run(cmd, shell=True)
                 
-                # Get format choice
-                format_code = input("\n🎬 Enter format code (default: 'best'): ").strip()
-                if not format_code:
-                    format_code = "best"
-                
-                # Get video info
-                info = self.get_video_info(url)
-                if info:
-                    title = info.get('title', 'Unknown')
-                    duration = info.get('duration_string', 'Unknown')
-                    print(f"\n📝 Title: {title}")
-                    print(f"⏱️  Duration: {duration}")
-                
-                # Confirm download
-                confirm = input(f"\n❓ Download with format '{format_code}'? (y/N): ").strip().lower()
-                
-                if confirm == 'y':
-                    # Download video
-                    success = self.download_video(url, format_code)
-                    
-                    if success:
-                        # Ask for another download
-                        another = input("\n❓ Download another video? (y/N): ").strip().lower()
-                        if another != 'y':
-                            print("\n👋 Goodbye!")
-                            break
-                    else:
-                        retry = input("\n❓ Download failed. Try again? (y/N): ").strip().lower()
-                        if retry != 'y':
-                            break
-                else:
-                    print("⚠️  Download cancelled")
-                
-                self.clear_screen()
-                self.show_banner()
-                
-            except KeyboardInterrupt:
-                print("\n\n⚠️  Interrupted by user")
+            elif choice == "2":
+                url = input("Enter Twitter/X URL: ").strip()
+                if url:
+                    subprocess.run(f'yt-dlp -F "{url}"', shell=True)
+            
+            elif choice == "3":
+                print("Goodbye!")
                 break
-            except Exception as e:
-                print(f"\n❌ Error: {str(e)}")
-                continue
-
-def main():
-    """Main function"""
-    downloader = TwitterDownloader()
-    downloader.run_interactive()
+            
+            else:
+                print("Invalid choice!")
+                
+        except KeyboardInterrupt:
+            print("\nGoodbye!")
+            break
+        except Exception as e:
+            print(f"Error: {e}")
 
 if __name__ == "__main__":
     main()
-EOF
+PYEOF
     
     # Give execute permission
-    os.chmod('/opt/twitter-dl/twitter_downloader.py', 0o755)
+    chmod +x /opt/twitter-downloader/download.py
     
-    # Create launcher script
+    # Create bash wrapper
     cat > /usr/local/bin/twitter-dl << 'EOF'
 #!/bin/bash
-# Twitter/X Video Downloader Launcher
-
-python3 /opt/twitter-dl/twitter_downloader.py "$@"
+python3 /opt/twitter-downloader/download.py "$@"
 EOF
     
-    # Give execute permission
-    chmod +x /usr/local/bin/twitter_downloader.py
     chmod +x /usr/local/bin/twitter-dl
     
-    # Create simple bash script alternative
+    # Create quick download command
     cat > /usr/local/bin/twitter-download << 'EOF'
 #!/bin/bash
-# Simple Twitter Download Script
-
 if [ -z "$1" ]; then
-    echo "Usage: twitter-download <twitter-url> [format]"
-    echo ""
-    echo "Examples:"
-    echo "  twitter-download https://twitter.com/user/status/123456789"
-    echo "  twitter-download https://x.com/user/status/123456789 best"
-    echo "  twitter-download https://twitter.com/user/status/123456789 137+140"
-    echo ""
-    echo "To see available formats:"
-    echo "  yt-dlp -F <url>"
+    echo "Usage: twitter-download <url> [format]"
+    echo "Example: twitter-download https://twitter.com/... best"
     exit 1
 fi
 
@@ -402,142 +178,177 @@ FORMAT="${2:-best}"
 
 echo "Downloading: $URL"
 echo "Format: $FORMAT"
-echo ""
-
-cd ~/Downloads 2>/dev/null || cd ~
-
 yt-dlp -f "$FORMAT" -o "%(title)s.%(ext)s" "$URL"
-
-if [ $? -eq 0 ]; then
-    echo ""
-    echo "✅ Download completed!"
-else
-    echo ""
-    echo "❌ Download failed!"
-fi
 EOF
     
     chmod +x /usr/local/bin/twitter-download
     
-    print_success "Download scripts created"
+    success "Scripts created"
 }
 
-# Create configuration
-create_config() {
-    print_info "Creating configuration..."
+# Create advanced download script
+create_advanced_script() {
+    info "Creating advanced download script..."
     
-    # Create config directory
-    mkdir -p /etc/twitter-dl
+    cat > /opt/twitter-downloader/advanced.py << 'PYEOF'
+#!/usr/bin/env python3
+import subprocess
+import json
+import os
+
+class TwitterDownloader:
+    def get_formats(self, url):
+        """Get available formats"""
+        cmd = ['yt-dlp', '-F', '--no-warnings', url]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        return result.stdout if result.returncode == 0 else None
     
-    # Create basic config
-    cat > /etc/twitter-dl/config.json << 'EOF'
-{
-    "download_path": "~/Downloads/Twitter",
-    "default_format": "best",
-    "enable_progress": true,
-    "max_retries": 3,
-    "timeout": 30
-}
+    def get_info(self, url):
+        """Get video info"""
+        cmd = ['yt-dlp', '--skip-download', '--dump-json', '--no-warnings', url]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            try:
+                return json.loads(result.stdout)
+            except:
+                return None
+        return None
+    
+    def download(self, url, fmt):
+        """Download video"""
+        cmd = ['yt-dlp', '-f', fmt, '-o', '%(title)s.%(ext)s', url]
+        return subprocess.run(cmd).returncode
+    
+    def run(self):
+        """Run interactive downloader"""
+        print("\n" + "="*50)
+        print("    TWITTER/X VIDEO DOWNLOADER - ADVANCED")
+        print("="*50)
+        
+        while True:
+            print("\nEnter Twitter/X URL (or 'exit' to quit):")
+            url = input("> ").strip()
+            
+            if url.lower() == 'exit':
+                break
+            
+            if not url:
+                continue
+            
+            # Get info
+            info = self.get_info(url)
+            if info:
+                print(f"\nTitle: {info.get('title', 'N/A')}")
+                print(f"Duration: {info.get('duration_string', 'N/A')}")
+            
+            # Get formats
+            print("\nGetting available formats...")
+            formats = self.get_formats(url)
+            if formats:
+                print(formats)
+            else:
+                print("Could not get formats")
+                continue
+            
+            # Get format choice
+            fmt = input("\nEnter format code (default: best): ").strip()
+            if not fmt:
+                fmt = "best"
+            
+            # Confirm
+            confirm = input(f"\nDownload with format '{fmt}'? (y/N): ").strip().lower()
+            if confirm == 'y':
+                print("\nDownloading...")
+                if self.download(url, fmt) == 0:
+                    print("\nDownload completed successfully!")
+                else:
+                    print("\nDownload failed!")
+            
+            # Another?
+            another = input("\nDownload another? (y/N): ").strip().lower()
+            if another != 'y':
+                break
+
+if __name__ == "__main__":
+    dl = TwitterDownloader()
+    dl.run()
+PYEOF
+    
+    chmod +x /opt/twitter-downloader/advanced.py
+    
+    cat > /usr/local/bin/twitter-dl-advanced << 'EOF'
+#!/bin/bash
+python3 /opt/twitter-downloader/advanced.py
 EOF
     
-    print_success "Configuration created"
+    chmod +x /usr/local/bin/twitter-dl-advanced
+    
+    success "Advanced script created"
 }
 
-# Add to bashrc
+# Setup aliases
 setup_aliases() {
-    print_info "Setting up aliases..."
+    info "Setting up aliases..."
     
-    # Add aliases to bashrc if they don't exist
-    if ! grep -q "twitter-dl" /root/.bashrc 2>/dev/null; then
-        echo "" >> /root/.bashrc
-        echo "# Twitter Downloader Aliases" >> /root/.bashrc
-        echo "alias twitter-dl='/usr/local/bin/twitter-dl'" >> /root/.bashrc
-        echo "alias twitter-download='/usr/local/bin/twitter-download'" >> /root/.bashrc
-        echo "alias tdl='/usr/local/bin/twitter-dl'" >> /root/.bashrc
+    # Create aliases in bashrc
+    cat >> ~/.bashrc << 'EOF'
+
+# Twitter Downloader Aliases
+alias tdl='/usr/local/bin/twitter-dl'
+alias twitter-download='/usr/local/bin/twitter-download'
+alias tdl-adv='/usr/local/bin/twitter-dl-advanced'
+EOF
+    
+    # Also for root if not already
+    if [ -f /root/.bashrc ] && ! grep -q "tdl" /root/.bashrc; then
+        cat >> /root/.bashrc << 'EOF'
+
+# Twitter Downloader Aliases
+alias tdl='/usr/local/bin/twitter-dl'
+alias twitter-download='/usr/local/bin/twitter-download'
+EOF
     fi
     
-    # Also for current user if not root
-    if [ "$(whoami)" != "root" ]; then
-        if [ -f ~/.bashrc ] && ! grep -q "twitter-dl" ~/.bashrc; then
-            echo "" >> ~/.bashrc
-            echo "# Twitter Downloader Aliases" >> ~/.bashrc
-            echo "alias twitter-dl='/usr/local/bin/twitter-dl'" >> ~/.bashrc
-            echo "alias tdl='/usr/local/bin/twitter-dl'" >> ~/.bashrc
-        fi
-    fi
-    
-    print_success "Aliases added"
+    success "Aliases added"
 }
 
-# Show completion message
+# Show completion
 show_completion() {
     echo -e "${GREEN}"
-    echo "╔══════════════════════════════════════════════════╗"
-    echo "║                                                  ║"
-    echo "║           INSTALLATION COMPLETE! 🎉             ║"
-    echo "║                                                  ║"
-    echo "╚══════════════════════════════════════════════════╝"
+    echo "=============================================="
+    echo "     INSTALLATION COMPLETE!"
+    echo "=============================================="
     echo -e "${NC}"
     
-    echo -e "\n${CYAN}📦 Available Commands:${NC}"
-    echo -e "${GREEN}  twitter-dl${NC}        - Interactive downloader"
-    echo -e "${GREEN}  twitter-download${NC}  - Quick download (twitter-download <url> [format])"
-    echo -e "${GREEN}  tdl${NC}              - Short alias for twitter-dl"
+    echo -e "\n${BLUE}Available Commands:${NC}"
+    echo "  tdl                 - Simple downloader"
+    echo "  twitter-download    - Quick download"
+    echo "  tdl-adv            - Advanced downloader"
+    echo "  yt-dlp             - Direct yt-dlp usage"
     
-    echo -e "\n${CYAN}🚀 Quick Start:${NC}"
-    echo -e "  ${GREEN}1.${NC} Open new terminal or run: ${YELLOW}source ~/.bashrc${NC}"
-    echo -e "  ${GREEN}2.${NC} Start downloader: ${YELLOW}twitter-dl${NC}"
-    echo -e "  ${GREEN}3.${NC} Enter Twitter/X URL when prompted"
+    echo -e "\n${BLUE}Usage Examples:${NC}"
+    echo '  tdl'
+    echo '  twitter-download "https://twitter.com/user/status/123"'
+    echo '  twitter-download "https://x.com/user/status/123" "best"'
+    echo '  yt-dlp -F "https://twitter.com/user/status/123"'
     
-    echo -e "\n${CYAN}📝 Examples:${NC}"
-    echo -e "  ${YELLOW}twitter-dl${NC}"
-    echo -e "  ${YELLOW}twitter-download https://twitter.com/user/status/123456789${NC}"
-    echo -e "  ${YELLOW}twitter-download https://x.com/user/status/123456789 'best'${NC}"
+    echo -e "\n${BLUE}Quick Test:${NC}"
+    echo '  tdl'
+    echo '  (Then follow prompts)'
     
-    echo -e "\n${CYAN}📁 Download Location:${NC}"
-    echo -e "  ${YELLOW}~/Downloads/Twitter/${NC}"
-    
-    echo -e "\n${CYAN}🔧 Manual Download with yt-dlp:${NC}"
-    echo -e "  ${YELLOW}yt-dlp -F <url>${NC}               # Show available formats"
-    echo -e "  ${YELLOW}yt-dlp -f best <url>${NC}          # Download best quality"
-    echo -e "  ${YELLOW}yt-dlp -f '137+140' <url>${NC}     # Download specific format"
-    
-    echo -e "\n${YELLOW}Need help?${NC} Run ${GREEN}twitter-dl${NC} and type 'help' when prompted.\n"
+    echo -e "\n${YELLOW}Note:${NC} Restart terminal or run: ${BLUE}source ~/.bashrc${NC}"
 }
 
-# Main installation function
-main_installation() {
+# Main installation
+main() {
     show_logo
-    check_root
-    install_dependencies
+    install_deps
     install_python_packages
-    create_download_script
-    create_config
+    create_simple_script
+    create_advanced_script
     setup_aliases
     show_completion
 }
 
-# Handle errors
-handle_error() {
-    print_error "Installation failed!"
-    print_error "Error on line $1"
-    exit 1
-}
-
-# Set error trap
-trap 'handle_error $LINENO' ERR
-
-# Run installation
-main_installation
-
-# Load aliases immediately
-if [ -f /root/.bashrc ]; then
-    source /root/.bashrc 2>/dev/null || true
-fi
-
-if [ -f ~/.bashrc ]; then
-    source ~/.bashrc 2>/dev/null || true
-fi
-
-print_info "Installation finished successfully!"
-print_info "You can now use 'twitter-dl' command"
+# Run
+main
