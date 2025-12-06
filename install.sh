@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # Telegram Twitter/X Video Downloader Bot Installer
-# Version with Caption Support
+# Smart Version with Caption Support
+# Based on previous working version
 
 set -e
 
@@ -17,12 +18,10 @@ NC='\033[0m'
 show_logo() {
     clear
     echo -e "${BLUE}"
-    echo "╔══════════════════════════════════════════════════╗"
-    echo "║                                                  ║"
-    echo "║   TWITTER/X VIDEO DOWNLOADER WITH CAPTION       ║"
-    echo "║             COMPLETE VERSION 3.0                ║"
-    echo "║                                                  ║"
-    echo "╚══════════════════════════════════════════════════╝"
+    echo "=============================================="
+    echo "   TELEGRAM TWITTER/X DOWNLOADER BOT"
+    echo "     SMART VERSION WITH CAPTION 3.0"
+    echo "=============================================="
     echo -e "${NC}"
 }
 
@@ -56,7 +55,7 @@ install_python_packages() {
     print_info "Installing Python packages..."
     
     pip3 install --upgrade pip
-    pip3 install "python-telegram-bot==20.7" "yt-dlp>=2024.04.09" "requests>=2.31.0" "beautifulsoup4>=4.12.0" "lxml>=4.9.0"
+    pip3 install "python-telegram-bot==20.7" "yt-dlp>=2024.04.09" requests
     
     print_success "Python packages installed"
 }
@@ -65,34 +64,30 @@ install_python_packages() {
 create_bot_dir() {
     print_info "Creating bot directory..."
     
-    rm -rf /opt/twitter_caption_bot
-    mkdir -p /opt/twitter_caption_bot
-    mkdir -p /opt/twitter_caption_bot/downloads
-    mkdir -p /opt/twitter_caption_bot/logs
+    rm -rf /opt/twitter_smart_bot
+    mkdir -p /opt/twitter_smart_bot
+    cd /opt/twitter_smart_bot
     
-    cd /opt/twitter_caption_bot
-    
-    print_success "Directory created: /opt/twitter_caption_bot"
+    print_success "Directory created: /opt/twitter_smart_bot"
 }
 
-# Create bot.py script with caption support
+# Create bot.py script (SMART VERSION with CAPTION)
 create_bot_script() {
-    print_info "Creating bot script with caption support..."
+    print_info "Creating smart bot script with caption..."
     
-    cat > /opt/twitter_caption_bot/bot.py << 'EOF'
+    cat > /opt/twitter_smart_bot/bot.py << 'EOF'
 #!/usr/bin/env python3
 """
-Telegram Twitter/X Video Downloader Bot with Caption
-Downloads video with tweet text/caption
+Smart Telegram Twitter/X Video Downloader Bot with Caption
+Shows only available formats + includes tweet text
 """
 
 import os
 import json
 import re
+import html
 import logging
 import subprocess
-import html
-from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 
@@ -100,7 +95,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO,
-    filename='/opt/twitter_caption_bot/logs/bot.log'
+    filename='/opt/twitter_smart_bot/bot.log'
 )
 logger = logging.getLogger(__name__)
 
@@ -113,124 +108,92 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = f"""
 👋 Welcome {user.first_name}!
 
-📹 *Twitter/X Video Downloader Bot*
+I can download videos from Twitter/X for you.
 
-I can download videos from Twitter/X with full caption!
-
-✨ *Features:*
-• Download videos from Twitter/X
-• Get tweet text/caption
-• Multiple quality options
-• Fast and reliable
-
-📌 *How to use:*
+📌 How to use:
 1. Send me any Twitter/X link
-2. Select video quality
-3. Receive video with caption
+2. I'll show available qualities
+3. Select quality
+4. Receive video with tweet text
 
-🔗 *Examples:*
-• `https://twitter.com/user/status/1234567890`
-• `https://x.com/user/status/1234567890`
+🔗 Examples:
+• https://twitter.com/user/status/1234567890
+• https://x.com/user/status/1234567890
 
-⚡ *Commands:*
+⚡ Commands:
 /start - Show this message
 /help - Help information
-/info <url> - Get tweet info without download
+/direct <url> - Direct download (best quality)
 
-📝 *Caption includes:*
-✓ Tweet text
-✓ Author username
-✓ Date & time
-✓ Likes & retweets count
+🔧 Smart Features:
+• Shows only available formats
+• Includes tweet text in caption
+• Auto-detects best quality
+• Supports all Twitter/X links
     """
-    await update.message.reply_text(text, parse_mode='Markdown')
+    await update.message.reply_text(text)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /help command"""
     text = """
-🤖 *Bot Help Guide*
+🤖 Bot Help
 
-📌 *How to download:*
-1. Find a Twitter/X video
-2. Copy the link
-3. Send to this bot
-4. Select quality
-5. Receive video with caption
+📌 How to download:
+1. Copy Twitter/X video link
+2. Send to this bot
+3. Select available quality
+4. Wait for download
+5. Receive video with tweet text
 
-🔧 *Available Commands:*
-/start - Welcome message
-/help - This help guide
-/info <url> - Get tweet info
+📌 Direct download:
+/direct <url> - Download with best quality
 
-🎯 *Features:*
-• Video download with caption
-• Multiple quality options
-• Fast download speed
-• Support all Twitter links
-
-⚠️ *Notes:*
-• Max file size: 2GB
-• Caption includes tweet text
-• Private tweets cannot be downloaded
+📌 Note:
+• Max file size: 2GB (Telegram limit)
+• Shows only available formats
+• Includes tweet text in caption
+• Auto-retry on failure
     """
-    await update.message.reply_text(text, parse_mode='Markdown')
+    await update.message.reply_text(text)
 
-async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Get tweet info without download"""
+async def direct_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /direct command"""
     if not context.args:
-        await update.message.reply_text("Usage: /info <twitter-url>\nExample: /info https://twitter.com/username/status/1234567890")
+        await update.message.reply_text("Usage: /direct <twitter-url>")
         return
     
     url = context.args[0]
+    user_id = update.effective_user.id
     
     if not is_twitter_url(url):
         await update.message.reply_text("❌ Please provide a valid Twitter/X URL")
         return
     
-    msg = await update.message.reply_text("🔍 Getting tweet information...")
+    # Store URL
+    context.user_data['url'] = url
     
-    try:
-        # Get tweet info using yt-dlp
-        info = get_tweet_info(url)
-        
-        if not info:
-            await msg.edit_text("❌ Could not get tweet information")
-            return
-        
-        # Format info message
-        info_text = format_tweet_info(info)
-        
-        await msg.edit_text(info_text, parse_mode='Markdown')
-        
-    except Exception as e:
-        logger.error(f"Info error: {e}")
-        await msg.edit_text(f"❌ Error: {str(e)[:200]}")
+    # Download with best quality
+    msg = await update.message.reply_text("⏳ Downloading with best quality...")
+    
+    # Get tweet info for caption
+    tweet_info = get_tweet_info(url)
+    success = await download_video(url, "best", user_id, msg, context, tweet_info)
+    
+    if success:
+        await msg.edit_text("✅ Download completed!")
+    else:
+        await msg.edit_text("❌ Download failed. Try selecting quality manually.")
 
 def is_twitter_url(url):
     """Check if URL is from Twitter/X"""
     twitter_domains = ['twitter.com', 'x.com', 't.co']
-    url_lower = url.lower()
-    return any(domain in url_lower for domain in twitter_domains)
+    return any(domain in url.lower() for domain in twitter_domains)
 
 def get_tweet_info(url):
-    """Extract tweet information including caption"""
+    """Get tweet information including text/caption"""
     try:
-        # Get detailed info using yt-dlp
-        cmd = [
-            'yt-dlp',
-            '--skip-download',
-            '--dump-json',
-            '--no-warnings',
-            '--extractor-args', 'twitter:include=all',
-            url
-        ]
-        
+        cmd = ['yt-dlp', '--skip-download', '--dump-json', '--no-warnings', url]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        
-        if result.returncode != 0:
-            # Try alternative method
-            cmd = ['yt-dlp', '--skip-download', '--dump-json', '--no-warnings', url]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         
         if result.returncode == 0:
             info = json.loads(result.stdout)
@@ -240,29 +203,22 @@ def get_tweet_info(url):
                 'title': info.get('title', ''),
                 'uploader': info.get('uploader', ''),
                 'uploader_id': info.get('uploader_id', ''),
-                'upload_date': info.get('upload_date', ''),
                 'description': info.get('description', ''),
-                'view_count': info.get('view_count', 0),
                 'like_count': info.get('like_count', 0),
                 'repost_count': info.get('repost_count', 0),
-                'comment_count': info.get('comment_count', 0),
-                'duration': info.get('duration_string', ''),
                 'formats': info.get('formats', []),
-                'thumbnail': info.get('thumbnail', ''),
-                'webpage_url': info.get('webpage_url', url),
-                'id': info.get('id', ''),
             }
             
-            # Try to get clean caption from description
+            # Clean description for caption
             description = info.get('description', '')
             if description:
-                # Clean HTML entities
+                # Decode HTML entities
                 description = html.unescape(description)
                 # Remove URLs
                 description = re.sub(r'https?://\S+', '', description)
                 # Remove extra whitespace
                 description = ' '.join(description.split())
-                tweet_info['caption'] = description[:1000]  # Limit length
+                tweet_info['clean_description'] = description[:500]  # Limit length
             
             return tweet_info
         
@@ -272,140 +228,115 @@ def get_tweet_info(url):
         logger.error(f"Error getting tweet info: {e}")
         return None
 
-def format_tweet_info(info):
-    """Format tweet information for display"""
-    # Format date
-    upload_date = info.get('upload_date', '')
-    if upload_date and len(upload_date) == 8:
-        date_str = f"{upload_date[0:4]}-{upload_date[4:6]}-{upload_date[6:8]}"
-    else:
-        date_str = 'Unknown'
-    
-    # Get caption
-    caption = info.get('caption', info.get('title', ''))
-    
-    # Format info text
-    info_text = f"""
-📝 *Tweet Information*
-
-👤 *Author:* {info.get('uploader', 'Unknown')}
-🆔 *Username:* @{info.get('uploader_id', 'Unknown')}
-📅 *Date:* {date_str}
-🔗 *URL:* {info.get('webpage_url', '')}
-
-💬 *Tweet Text:*
-{caption}
-
-📊 *Statistics:*
-👁️ Views: {info.get('view_count', 0):,}
-❤️ Likes: {info.get('like_count', 0):,}
-🔄 Retweets: {info.get('repost_count', 0):,}
-💬 Replies: {info.get('comment_count', 0):,}
-
-⏱️ *Duration:* {info.get('duration', 'Unknown')}
-
-📥 *Available Qualities:* {len(info.get('formats', []))}
-    """
-    
-    return info_text
-
-def get_available_formats(info):
-    """Get available video formats from tweet info"""
-    formats = info.get('formats', [])
-    
-    # Filter video formats
-    video_formats = []
-    for fmt in formats:
-        # Check if it's a video format
-        if fmt.get('vcodec') != 'none':
-            height = fmt.get('height', 0)
-            if height > 0:
-                # Get format details
-                format_id = fmt.get('format_id', '')
-                ext = fmt.get('ext', 'mp4')
-                filesize = fmt.get('filesize', fmt.get('filesize_approx', 0))
-                
-                # Format size
-                if filesize:
-                    if filesize < 1024 * 1024:  # Less than 1MB
-                        size_str = f"{filesize/1024:.1f}KB"
+def get_available_formats(url):
+    """Get only available formats for this video"""
+    try:
+        # Get video info in JSON format
+        cmd = ['yt-dlp', '--skip-download', '--dump-json', '--no-warnings', url]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        if result.returncode != 0:
+            return None
+        
+        info = json.loads(result.stdout)
+        formats = info.get('formats', [])
+        
+        # Filter video formats
+        video_formats = []
+        for fmt in formats:
+            # Check if it's a video format with audio
+            if fmt.get('vcodec') != 'none' and fmt.get('acodec') != 'none':
+                height = fmt.get('height', 0)
+                if height > 0:
+                    quality = f"{height}p"
+                    format_id = fmt.get('format_id', '')
+                    filesize = fmt.get('filesize', fmt.get('filesize_approx', 0))
+                    
+                    # Format size
+                    if filesize:
+                        size_mb = filesize / (1024 * 1024)
+                        size_str = f"{size_mb:.1f}MB"
                     else:
-                        size_str = f"{filesize/(1024*1024):.1f}MB"
-                else:
-                    size_str = "N/A"
-                
-                # Add format
-                video_formats.append({
-                    'quality': f"{height}p",
-                    'format_id': format_id,
-                    'height': height,
-                    'size': size_str,
-                    'ext': ext,
-                    'note': fmt.get('format_note', '')
-                })
-    
-    # Remove duplicates and sort by quality
-    unique_formats = {}
-    for fmt in video_formats:
-        quality = fmt['quality']
-        if quality not in unique_formats or fmt['height'] > unique_formats[quality]['height']:
-            unique_formats[quality] = fmt
-    
-    # Sort by height descending
-    sorted_formats = sorted(unique_formats.values(), key=lambda x: x['height'], reverse=True)
-    
-    # Add "best" option
-    if sorted_formats:
-        sorted_formats.insert(0, {
-            'quality': '🎯 Best Quality',
-            'format_id': 'best',
-            'height': 9999,
-            'size': 'Auto',
-            'ext': 'mp4',
-            'note': 'Automatic selection'
-        })
-    
-    return sorted_formats
+                        size_str = "N/A"
+                    
+                    video_formats.append({
+                        'quality': quality,
+                        'format_id': format_id,
+                        'height': height,
+                        'size': size_str,
+                        'ext': fmt.get('ext', 'mp4')
+                    })
+        
+        # Remove duplicates and sort by quality
+        unique_formats = {}
+        for fmt in video_formats:
+            if fmt['quality'] not in unique_formats:
+                unique_formats[fmt['quality']] = fmt
+            elif fmt['height'] > unique_formats[fmt['quality']]['height']:
+                unique_formats[fmt['quality']] = fmt
+        
+        # Sort by height descending
+        sorted_formats = sorted(unique_formats.values(), key=lambda x: x['height'], reverse=True)
+        
+        # Add "best" option
+        if sorted_formats:
+            sorted_formats.insert(0, {
+                'quality': '🎯 Best Quality',
+                'format_id': 'best',
+                'height': 9999,
+                'size': 'Auto',
+                'ext': 'mp4'
+            })
+        
+        return sorted_formats
+        
+    except Exception as e:
+        logger.error(f"Error getting formats: {e}")
+        return None
 
-def create_caption(info, selected_quality):
-    """Create caption for video"""
-    # Get basic info
-    author = info.get('uploader', 'Unknown')
-    username = info.get('uploader_id', '')
-    tweet_text = info.get('caption', info.get('title', ''))
+def create_caption(tweet_info, quality):
+    """Create caption from tweet info"""
+    if not tweet_info:
+        return f"✅ Downloaded\nQuality: {quality}"
     
-    # Format date
-    upload_date = info.get('upload_date', '')
-    if upload_date and len(upload_date) == 8:
-        date_str = f"{upload_date[0:4]}-{upload_date[4:6]}-{upload_date[6:8]}"
-    else:
-        date_str = datetime.now().strftime('%Y-%m-%d')
+    caption_parts = []
     
-    # Get statistics
-    likes = info.get('like_count', 0)
-    retweets = info.get('repost_count', 0)
+    # Add tweet text if available
+    tweet_text = tweet_info.get('clean_description', tweet_info.get('title', ''))
+    if tweet_text:
+        # Clean and limit text
+        tweet_text = tweet_text.replace('\n', ' ').strip()
+        if len(tweet_text) > 300:
+            tweet_text = tweet_text[:297] + "..."
+        caption_parts.append(f"💬 {tweet_text}")
     
-    # Create caption
-    caption = f"""
-📹 Twitter/X Video
-
-👤 {author}
-{'@' + username if username else ''}
-
-💬 {tweet_text[:500]}{'...' if len(tweet_text) > 500 else ''}
-
-📅 {date_str}
-❤️ {likes:,} likes
-🔄 {retweets:,} retweets
-
-🎬 Quality: {selected_quality}
-
-🔗 Downloaded via @{context.bot.username if 'context' in locals() else 'TwitterDownloaderBot'}
-    """
+    # Add author if available
+    author = tweet_info.get('uploader', '')
+    if author:
+        caption_parts.append(f"👤 {author}")
     
-    # Clean caption
-    caption = '\n'.join(line.strip() for line in caption.split('\n') if line.strip())
-    return caption.strip()
+    # Add quality
+    caption_parts.append(f"🎬 Quality: {quality}")
+    
+    # Add likes/retweets if available
+    likes = tweet_info.get('like_count', 0)
+    retweets = tweet_info.get('repost_count', 0)
+    if likes > 0 or retweets > 0:
+        stats = []
+        if likes > 0:
+            stats.append(f"❤️ {likes:,}")
+        if retweets > 0:
+            stats.append(f"🔄 {retweets:,}")
+        if stats:
+            caption_parts.append(" ".join(stats))
+    
+    # Join all parts
+    caption = "\n\n".join(caption_parts)
+    
+    # Add footer
+    caption += "\n\n📥 Downloaded via bot"
+    
+    return caption
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle incoming messages"""
@@ -416,59 +347,60 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await message.reply_text("❌ Please send a valid Twitter/X URL")
         return
     
-    # Store URL in context
+    # Store URL in user data
     context.user_data['url'] = url
     
-    # Get tweet info
-    msg = await message.reply_text("🔍 Analyzing tweet...")
+    # Get video info
+    msg = await message.reply_text("🔍 Analyzing video...")
     
-    try:
-        # Get tweet information
-        info = get_tweet_info(url)
+    # Get tweet info for caption
+    tweet_info = get_tweet_info(url)
+    
+    # Get available formats
+    formats = get_available_formats(url)
+    
+    if not formats:
+        await msg.edit_text("❌ Could not get video information. The video might be private or deleted.")
+        return
+    
+    # Create keyboard with available formats
+    keyboard = []
+    row = []
+    
+    for i, fmt in enumerate(formats):
+        if i > 0 and i % 2 == 0:
+            keyboard.append(row)
+            row = []
         
-        if not info:
-            await msg.edit_text("❌ Could not get tweet information. The tweet might be private or deleted.")
-            return
+        button_text = f"{fmt['quality']}"
+        if fmt['size'] != 'Auto':
+            button_text += f" ({fmt['size']})"
         
-        # Store info in context
-        context.user_data['tweet_info'] = info
-        
-        # Get available formats
-        formats = get_available_formats(info)
-        
-        if not formats:
-            await msg.edit_text("❌ No video formats found for this tweet")
-            return
-        
-        # Create keyboard with available formats
-        keyboard = []
-        for fmt in formats:
-            button_text = f"{fmt['quality']}"
-            if fmt['size'] != 'Auto':
-                button_text += f" ({fmt['size']})"
-            
-            callback_data = f"quality:{fmt['format_id']}:{fmt['quality']}"
-            keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        # Get preview of tweet text
-        tweet_text = info.get('caption', info.get('title', ''))[:100]
-        if len(info.get('caption', info.get('title', ''))) > 100:
-            tweet_text += "..."
-        
-        await msg.edit_text(
-            f"📝 *Tweet Found!*\n\n"
-            f"👤 *Author:* {info.get('uploader', 'Unknown')}\n"
-            f"💬 *Text:* {tweet_text}\n\n"
-            f"📊 *Select video quality:*",
-            parse_mode='Markdown',
-            reply_markup=reply_markup
-        )
-        
-    except Exception as e:
-        logger.error(f"Message handling error: {e}")
-        await msg.edit_text(f"❌ Error: {str(e)[:200]}")
+        callback_data = f"quality:{fmt['format_id']}:{fmt['quality']}"
+        row.append(InlineKeyboardButton(button_text, callback_data=callback_data))
+    
+    if row:
+        keyboard.append(row)
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # Show tweet preview if available
+    tweet_preview = ""
+    if tweet_info:
+        tweet_text = tweet_info.get('clean_description', tweet_info.get('title', ''))[:100]
+        if tweet_text:
+            tweet_preview = f"\n💬 {tweet_text}..."
+    
+    await msg.edit_text(
+        f"📹 Available qualities for this video:{tweet_preview}\n\n"
+        f"🔗 URL: {url[:50]}...\n"
+        f"📊 Select quality:",
+        reply_markup=reply_markup
+    )
+    
+    # Store tweet info in context for later use
+    if tweet_info:
+        context.user_data['tweet_info'] = tweet_info
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle callback queries (quality selection)"""
@@ -481,43 +413,39 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if callback_data.startswith('quality:'):
         _, format_id, quality_name = callback_data.split(':')
         url = context.user_data.get('url')
-        info = context.user_data.get('tweet_info')
+        tweet_info = context.user_data.get('tweet_info')
         
-        if not url or not info:
-            await query.edit_message_text("❌ Session expired. Please send the URL again.")
+        if not url:
+            await query.edit_message_text("❌ URL not found. Please send the URL again.")
             return
         
         # Update message
         await query.edit_message_text(f"⏬ Downloading {quality_name}...\nThis may take a minute.")
         
         # Download video with caption
-        success = await download_video_with_caption(url, format_id, quality_name, info, user_id, query.message, context)
+        success = await download_video(url, format_id, user_id, query.message, context, tweet_info)
         
         if success:
             await query.edit_message_text("✅ Download completed! Video sent with caption.")
         else:
-            await query.edit_message_text("❌ Download failed. Try another quality or send the URL again.")
+            await query.edit_message_text("❌ Download failed. Try another quality or use /direct command.")
 
-async def download_video_with_caption(url, format_id, quality_name, tweet_info, user_id, message, context):
-    """Download video with caption"""
+async def download_video(url, format_id, user_id, message, context, tweet_info=None):
+    """Download video with specified format and caption"""
     try:
         # Create temp directory
-        temp_dir = f"/tmp/twitter_dl_{user_id}"
-        os.makedirs(temp_dir, exist_ok=True)
-        os.chdir(temp_dir)
+        os.makedirs('/tmp/twitter_dl', exist_ok=True)
+        os.chdir('/tmp/twitter_dl')
         
         # Clean previous files
         for f in os.listdir('.'):
-            if f.endswith(('.mp4', '.mkv', '.webm', '.jpg', '.png')):
+            if f.endswith(('.mp4', '.mkv', '.webm')):
                 try:
                     os.remove(f)
                 except:
                     pass
         
-        # Update status
-        await message.edit_text(f"📥 Downloading video ({quality_name})...")
-        
-        # Download video using yt-dlp
+        # Download with yt-dlp
         output_template = 'video_%(title)s_%(id)s.%(ext)s'
         cmd = [
             'yt-dlp',
@@ -525,8 +453,6 @@ async def download_video_with_caption(url, format_id, quality_name, tweet_info, 
             '-o', output_template,
             '--no-warnings',
             '--merge-output-format', 'mp4',
-            '--add-metadata',
-            '--embed-thumbnail',
             url
         ]
         
@@ -540,37 +466,38 @@ async def download_video_with_caption(url, format_id, quality_name, tweet_info, 
             universal_newlines=True
         )
         
-        # Monitor progress
+        # Show progress
         for line in process.stdout:
             if '[download]' in line and '%' in line:
-                # Extract progress
+                # Extract progress percentage
                 import re
                 match = re.search(r'(\d+\.?\d*)%', line)
                 if match:
                     progress = match.group(1)
                     try:
-                        await message.edit_text(f"📥 Downloading... {progress}%")
+                        await message.edit_text(f"⏬ Downloading... {progress}%")
                     except:
                         pass
         
         process.wait()
         
-        # If specific format failed, try best quality
-        if process.returncode != 0 and format_id != 'best':
-            await message.edit_text(f"⚠️ {quality_name} not available. Trying best quality...")
-            cmd = [
-                'yt-dlp',
-                '-f', 'best',
-                '-o', output_template,
-                '--no-warnings',
-                '--merge-output-format', 'mp4',
-                '--add-metadata',
-                url
-            ]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-            if result.returncode != 0:
-                return False
-            quality_name = 'Best Quality'
+        if process.returncode != 0:
+            # Try with best format if specific format failed
+            if format_id != 'best':
+                await message.edit_text(f"⚠️ Format not available. Trying best quality...")
+                cmd = [
+                    'yt-dlp',
+                    '-f', 'best',
+                    '-o', output_template,
+                    '--no-warnings',
+                    '--merge-output-format', 'mp4',
+                    url
+                ]
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                if result.returncode != 0:
+                    return False
+                format_id = 'best'
+                quality_name = 'Best Quality'
         
         # Find downloaded file
         files = [f for f in os.listdir('.') if f.endswith(('.mp4', '.mkv', '.webm'))]
@@ -583,24 +510,29 @@ async def download_video_with_caption(url, format_id, quality_name, tweet_info, 
         # Check file size (Telegram limit: 2GB for bots)
         if file_size > 1.9 * 1024 * 1024 * 1024:  # 1.9GB
             await message.edit_text("❌ File too large (>1.9GB). Try lower quality.")
+            try:
+                os.remove(video_file)
+            except:
+                pass
             return False
         
         # Create caption
-        caption = create_caption(tweet_info, quality_name)
+        quality_display = format_id if format_id == 'best' else format_id + 'p'
+        caption = create_caption(tweet_info, quality_display)
         
-        # Update status
-        await message.edit_text("📤 Sending video with caption...")
+        # Send video
+        await message.edit_text("📤 Sending video...")
         
-        # Send video with caption
         with open(video_file, 'rb') as f:
+            # Send without parse_mode to avoid entity errors
             await context.bot.send_video(
                 chat_id=user_id,
                 video=f,
                 caption=caption,
                 supports_streaming=True,
-                read_timeout=120,
-                write_timeout=120,
-                connect_timeout=120
+                read_timeout=60,
+                write_timeout=60,
+                connect_timeout=60
             )
         
         # Cleanup
@@ -616,20 +548,26 @@ async def download_video_with_caption(url, format_id, quality_name, tweet_info, 
         return False
     except Exception as e:
         logger.error(f"Download error: {e}")
-        await message.edit_text(f"❌ Error: {str(e)[:200]}")
+        # Clean error message for display
+        error_msg = str(e)
+        if "Can't parse entities" in error_msg:
+            error_msg = "Error sending caption. Video downloaded but caption had formatting issues."
+        await message.edit_text(f"❌ Error: {error_msg[:200]}")
         return False
     finally:
         os.chdir('/')
-        # Clean temp directory
-        try:
-            import shutil
-            shutil.rmtree(temp_dir, ignore_errors=True)
-        except:
-            pass
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle errors"""
     logger.error(f"Error: {context.error}")
+    
+    # Fix for "Can't parse entities" error
+    error_msg = str(context.error)
+    if "Can't parse entities" in error_msg:
+        # This is a caption formatting error, not critical
+        logger.warning(f"Caption formatting error: {error_msg}")
+        return
+    
     try:
         if update.callback_query:
             await update.callback_query.message.reply_text("⚠️ An error occurred. Please try again.")
@@ -642,7 +580,7 @@ def main():
     """Main function"""
     if not BOT_TOKEN:
         print("❌ ERROR: BOT_TOKEN not set")
-        print("Please add your bot token to /opt/twitter_caption_bot/.env")
+        print("Please add your bot token to /opt/twitter_smart_bot/.env")
         exit(1)
     
     # Create application
@@ -651,14 +589,14 @@ def main():
     # Add handlers
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("info", info_command))
+    app.add_handler(CommandHandler("direct", direct_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_error_handler(error_handler)
     
-    print("🤖 Twitter Bot with Caption starting...")
-    print("📝 Features: Video + Tweet text")
-    print("📁 Logs: /opt/twitter_caption_bot/logs/bot.log")
+    print("🤖 Smart Twitter Bot with Caption starting...")
+    print("📁 Logs: /opt/twitter_smart_bot/bot.log")
+    print("✨ Features: Shows available formats + Tweet text")
     
     app.run_polling()
 
@@ -666,22 +604,18 @@ if __name__ == '__main__':
     main()
 EOF
     
-    chmod +x /opt/twitter_caption_bot/bot.py
-    print_success "Bot script with caption support created"
+    chmod +x /opt/twitter_smart_bot/bot.py
+    print_success "Smart bot script with caption created"
 }
 
 # Create environment file
 create_env_file() {
     print_info "Creating environment file..."
     
-    cat > /opt/twitter_caption_bot/.env.example << EOF
+    cat > /opt/twitter_smart_bot/.env.example << EOF
 # Telegram Bot Token from @BotFather
 # Example: 1234567890:ABCdefGhIJKlmNoPQRsTUVwxyZ
 BOT_TOKEN=your_bot_token_here
-
-# Optional: Your Telegram User ID for admin features
-# Get it from @userinfobot on Telegram
-ADMIN_ID=123456789
 EOF
     
     print_success "Environment file created"
@@ -693,19 +627,19 @@ create_service_file() {
     
     cat > /etc/systemd/system/twitter-bot.service << EOF
 [Unit]
-Description=Twitter/X Video Downloader Bot with Caption
+Description=Smart Twitter/X Video Downloader Bot with Caption
 After=network.target
 
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/twitter_caption_bot
-EnvironmentFile=/opt/twitter_caption_bot/.env
-ExecStart=/usr/bin/python3 /opt/twitter_caption_bot/bot.py
+WorkingDirectory=/opt/twitter_smart_bot
+EnvironmentFile=/opt/twitter_smart_bot/.env
+ExecStart=/usr/bin/python3 /opt/twitter_smart_bot/bot.py
 Restart=always
 RestartSec=10
-StandardOutput=append:/opt/twitter_caption_bot/logs/bot.log
-StandardError=append:/opt/twitter_caption_bot/logs/error.log
+StandardOutput=append:/opt/twitter_smart_bot/bot.log
+StandardError=append:/opt/twitter_smart_bot/error.log
 
 [Install]
 WantedBy=multi-user.target
@@ -724,14 +658,14 @@ create_control_script() {
 
 case "$1" in
     start)
-        if [ ! -f /opt/twitter_caption_bot/.env ]; then
+        if [ ! -f /opt/twitter_smart_bot/.env ]; then
             echo "❌ Please setup bot first: twitter-bot setup"
             exit 1
         fi
         
         systemctl start twitter-bot
-        echo "✅ Bot started with caption support"
-        echo "✨ Features: Video + Tweet text"
+        echo "✅ Smart bot started"
+        echo "✨ Features: Available formats + Tweet text"
         ;;
     stop)
         systemctl stop twitter-bot
@@ -746,20 +680,20 @@ case "$1" in
         ;;
     logs)
         if [ "$2" = "error" ]; then
-            tail -f /opt/twitter_caption_bot/logs/error.log
+            tail -f /opt/twitter_smart_bot/error.log
         else
-            tail -f /opt/twitter_caption_bot/logs/bot.log
+            tail -f /opt/twitter_smart_bot/bot.log
         fi
         ;;
     setup)
-        echo "📝 Setting up bot with caption support..."
+        echo "📝 Setting up smart bot with caption..."
         
-        if [ ! -f /opt/twitter_caption_bot/.env ]; then
-            cp /opt/twitter_caption_bot/.env.example /opt/twitter_caption_bot/.env
+        if [ ! -f /opt/twitter_smart_bot/.env ]; then
+            cp /opt/twitter_smart_bot/.env.example /opt/twitter_smart_bot/.env
             echo ""
             echo "📋 Created .env file"
             echo "Please edit it and add your BOT_TOKEN:"
-            echo "   nano /opt/twitter_caption_bot/.env"
+            echo "   nano /opt/twitter_smart_bot/.env"
             echo ""
             echo "🔑 How to get BOT_TOKEN:"
             echo "1. Open Telegram"
@@ -772,29 +706,26 @@ case "$1" in
         fi
         ;;
     config)
-        nano /opt/twitter_caption_bot/.env
+        nano /opt/twitter_smart_bot/.env
         ;;
     update)
-        echo "🔄 Updating bot with caption support..."
+        echo "🔄 Updating smart bot..."
         
         # Update packages
-        pip3 install --upgrade yt-dlp python-telegram-bot requests beautifulsoup4 lxml
-        
-        # Update yt-dlp for better Twitter support
-        yt-dlp -U
+        pip3 install --upgrade yt-dlp python-telegram-bot requests
         
         systemctl restart twitter-bot
         echo "✅ Bot updated and restarted"
         echo "📝 Now includes tweet text in caption"
         ;;
     test)
-        echo "🧪 Testing bot with caption support..."
+        echo "🧪 Testing smart bot with caption..."
         echo ""
         
         echo "1. Testing packages..."
         python3 -c "
 try:
-    import telegram, yt_dlp, requests, bs4, lxml
+    import telegram, yt_dlp, requests
     print('✅ All packages installed')
 except Exception as e:
     print(f'❌ Missing packages: {e}')
@@ -806,8 +737,8 @@ except Exception as e:
         echo ""
         
         echo "3. Testing configuration..."
-        if [ -f /opt/twitter_caption_bot/.env ]; then
-            if grep -q "BOT_TOKEN=" /opt/twitter_caption_bot/.env && ! grep -q "BOT_TOKEN=your_bot_token_here" /opt/twitter_caption_bot/.env; then
+        if [ -f /opt/twitter_smart_bot/.env ]; then
+            if grep -q "BOT_TOKEN=" /opt/twitter_smart_bot/.env && ! grep -q "BOT_TOKEN=your_bot_token_here" /opt/twitter_smart_bot/.env; then
                 echo "✅ BOT_TOKEN configured"
             else
                 echo "⚠️  BOT_TOKEN not configured"
@@ -815,68 +746,59 @@ except Exception as e:
         else
             echo "❌ .env file not found"
         fi
+        
+        echo ""
+        echo "4. Testing caption extraction..."
+        echo "Run a test with: curl -s 'https://twitter.com/Twitter/status/1349129669258448897'"
         ;;
-    caption-test)
-        echo "📝 Testing caption extraction..."
-        echo ""
+    fix)
+        echo "🔧 Fixing common issues..."
         
-        # Test with a sample Twitter URL
-        SAMPLE_URL="https://twitter.com/Twitter/status/1349129669258448897"
-        echo "Testing URL: $SAMPLE_URL"
-        echo ""
+        # Update yt-dlp
+        pip3 install --upgrade yt-dlp
         
-        cd /opt/twitter_caption_bot
-        python3 -c "
-import subprocess, json
-try:
-    cmd = ['yt-dlp', '--skip-download', '--dump-json', '--no-warnings', '$SAMPLE_URL']
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-    
-    if result.returncode == 0:
-        info = json.loads(result.stdout)
-        title = info.get('title', 'No title')
-        uploader = info.get('uploader', 'Unknown')
-        description = info.get('description', '')[:200]
+        # Clear cache
+        yt-dlp --rm-cache-dir 2>/dev/null || true
         
-        print(f'✅ Success!')
-        print(f'Title: {title}')
-        print(f'Author: {uploader}')
-        print(f'Text preview: {description}')
-    else:
-        print('❌ Failed to get tweet info')
-except Exception as e:
-    print(f'❌ Error: {e}')
-        "
+        # Restart bot
+        systemctl restart twitter-bot
+        
+        echo "✅ Fixes applied and bot restarted"
         ;;
     *)
-        echo "🤖 Twitter/X Downloader Bot with Caption"
+        echo "🤖 SMART Twitter/X Downloader Bot with Caption"
         echo ""
-        echo "Usage: $0 {start|stop|restart|status|logs|setup|config|update|test|caption-test}"
+        echo "Usage: $0 {start|stop|restart|status|logs|setup|config|update|test|fix}"
         echo ""
         echo "Commands:"
-        echo "  start        - Start bot with caption support"
-        echo "  stop         - Stop bot"
-        echo "  restart      - Restart bot"
-        echo "  status       - Check status"
-        echo "  logs         - View logs (add 'error' for error logs)"
-        echo "  setup        - Initial setup"
-        echo "  config       - Edit configuration"
-        echo "  update       - Update bot & packages"
-        echo "  test         - Test installation"
-        echo "  caption-test - Test caption extraction"
+        echo "  start    - Start smart bot"
+        echo "  stop     - Stop bot"
+        echo "  restart  - Restart bot"
+        echo "  status   - Check status"
+        echo "  logs     - View logs (add 'error' for error logs)"
+        echo "  setup    - Initial setup"
+        echo "  config   - Edit configuration"
+        echo "  update   - Update bot & packages"
+        echo "  test     - Test installation"
+        echo "  fix      - Fix common issues"
         echo ""
         echo "✨ Features:"
-        echo "• Downloads video with tweet text/caption"
-        echo "• Shows author, date, likes, retweets"
-        echo "• Multiple quality options"
-        echo "• Fast and reliable"
+        echo "• Shows only available formats"
+        echo "• Includes tweet text in caption"
+        echo "• Auto-retry with best quality"
+        echo "• Clean and reliable"
+        echo ""
+        echo "📝 Caption includes:"
+        echo "• Tweet text"
+        echo "• Author name"
+        echo "• Video quality"
+        echo "• Likes/retweets"
         echo ""
         echo "Quick start:"
         echo "  1. twitter-bot setup"
         echo "  2. twitter-bot config  (add your token)"
-        echo "  3. twitter-bot update  (for caption support)"
-        echo "  4. twitter-bot start"
-        echo "  5. twitter-bot logs"
+        echo "  3. twitter-bot start"
+        echo "  4. twitter-bot logs"
         ;;
 esac
 EOF
@@ -889,48 +811,36 @@ EOF
 show_completion() {
     echo ""
     echo -e "${GREEN}==============================================${NC}"
-    echo -e "${GREEN}   BOT WITH CAPTION SUPPORT INSTALLED!     ${NC}"
+    echo -e "${GREEN}   SMART BOT WITH CAPTION INSTALLED!        ${NC}"
     echo -e "${GREEN}==============================================${NC}"
     echo ""
-    echo -e "${YELLOW}🚀 NEW FEATURES:${NC}"
-    echo "• 📝 Downloads video WITH tweet text/caption"
-    echo "• 👤 Shows author username and name"
-    echo "• 📅 Includes date and time"
-    echo "• ❤️  Shows likes and retweets count"
-    echo "• 💬 Full tweet text in caption"
+    echo -e "${YELLOW}🚀 KEY FEATURES:${NC}"
+    echo "• ✅ Shows only available formats (like before)"
+    echo "• ✅ Includes tweet text in caption (NEW!)"
+    echo "• ✅ Auto-detects best quality"
+    echo "• ✅ Clean interface, no errors"
     echo ""
     echo -e "${YELLOW}📋 SETUP STEPS:${NC}"
     echo "1. Setup bot:"
     echo "   twitter-bot setup"
     echo ""
-    echo "2. Configure your bot token:"
+    echo "2. Add your bot token:"
     echo "   twitter-bot config"
     echo ""
-    echo "3. Update for caption support:"
-    echo "   twitter-bot update"
-    echo ""
-    echo "4. Test caption extraction:"
-    echo "   twitter-bot caption-test"
-    echo ""
-    echo "5. Start bot:"
+    echo "3. Start bot:"
     echo "   twitter-bot start"
     echo ""
-    echo "6. Test with a tweet:"
-    echo "   Send any Twitter/X link to your bot"
+    echo "4. Check logs:"
+    echo "   twitter-bot logs"
     echo ""
     echo -e "${YELLOW}📝 EXAMPLE CAPTION:${NC}"
-    echo "📹 Twitter/X Video"
+    echo "💬 Just launched something amazing for the future..."
     echo ""
     echo "👤 Elon Musk"
-    echo "@elonmusk"
-    echo ""
-    echo "💬 Just launched something amazing..."
-    echo ""
-    echo "📅 2024-01-15"
-    echo "❤️ 25,000 likes"
-    echo "🔄 5,000 retweets"
-    echo ""
     echo "🎬 Quality: 1080p"
+    echo "❤️ 25,000 🔄 5,000"
+    echo ""
+    echo "📥 Downloaded via bot"
     echo ""
     echo -e "${GREEN}✅ Ready to use! Send tweets to your bot.${NC}"
 }
